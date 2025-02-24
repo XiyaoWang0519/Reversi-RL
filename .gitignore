@@ -1,0 +1,38 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+.env/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Weights & Biases
+wandb/
+
+# Model files - excluding to keep repository size manageable
+models/*.pt
+models/pool/*.pt
+models/test_pool/*.pt
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Mac OS specific files
+.DS_Store
+
+# Log files
+logs/
+*.log
