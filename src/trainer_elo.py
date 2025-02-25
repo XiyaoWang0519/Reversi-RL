@@ -22,22 +22,22 @@ class ELOSelfPlayTrainer:
         # Initialize agent with improved parameters
         self.agent = RLAgent(board_size, num_channels, device)
         
-        # Initialize model pool for opponents with larger size
-        self.model_pool = ModelPool(save_dir="models/pool", max_pool_size=50)
+        # Initialize model pool for opponents with optimized size
+        self.model_pool = ModelPool(save_dir="models/pool", max_pool_size=30)  # Reduced from 50
         
         # Add current model to the pool
         self.current_agent_id = self.model_pool.add_model(self.agent.model)
         
-        # Initialize improved ELO tracker with larger window
-        self.elo_tracker = ELOTracker(window_size=200)
+        # Initialize improved ELO tracker with optimized parameters
+        self.elo_tracker = ELOTracker(window_size=100)
         
         # Training parameters
         self.num_episodes = 1000
         self.evaluation_interval = 50
         self.save_interval = 100
-        self.pool_update_interval = 100  # Add models less frequently for more stable ratings
-        self.temperature_threshold = 15  # Increased for more exploration
-        self.opponent_pool_temperature = 1.5  # Lower for more selective opponent sampling
+        self.pool_update_interval = 100
+        self.temperature_threshold = 15
+        self.opponent_pool_temperature = 2.0  # Increased from 1.5 for more diverse opponent selection
         
         # Additional training parameters
         self.evaluation_games = 20  # More evaluation games for better statistics
@@ -85,7 +85,7 @@ class ELOSelfPlayTrainer:
                 "elo_k_factor": self.elo_tracker.elo_system.base_k_factor,
                 "elo_smoothing_factor": self.elo_tracker.smoothing_factor
             }
-            wandb.init(project="reversi-rl-elo-improved", config=config)
+            wandb.init(project="reversi-rl-elo-improved", config=config, settings=wandb.Settings(symlink=False))
     
     def play_game_against_opponent(self, opponent_model, training=True):
         """Play a full game against a specific opponent model."""
@@ -383,13 +383,13 @@ class ELOSelfPlayTrainer:
                 
                 # Log model to W&B
                 if self.use_wandb:
-                    wandb.save(model_path)
+                    wandb.save(model_path, base_path="D:/Projects/Reversi-RL")
         
         # Save final model
         final_model_path = "models/reversi_agent_final.pt"
         self.agent.save_model(final_model_path)
         if self.use_wandb:
-            wandb.save(final_model_path)
+            wandb.save(final_model_path, base_path="D:/Projects/Reversi-RL")
             
             # Log final statistics
             wandb.run.summary.update({

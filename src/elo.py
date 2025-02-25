@@ -7,10 +7,13 @@ import copy
 from collections import deque
 from datetime import datetime
 
+# Add OpenMP environment variable
+os.environ['KMP_DUPLICATE_LIB_OK']='TRUE'
+
 class ELOSystem:
     """Implements an improved ELO rating system for Reversi agents."""
     
-    def __init__(self, base_elo=1000, k_factor=32):
+    def __init__(self, base_elo=1000, k_factor=40):
         """Initialize the ELO rating system.
         
         Args:
@@ -23,7 +26,7 @@ class ELOSystem:
         self.game_counts = {}  # Maps agent_id to number of games played
         self.confidence = {}  # Maps agent_id to confidence factor (0-1)
         self.win_streaks = {}  # Maps agent_id to current win streak
-        self.provisional_threshold = 30  # Number of games before an agent is no longer provisional
+        self.provisional_threshold = 20
     
     def get_rating(self, agent_id):
         """Get the ELO rating for an agent."""
@@ -71,13 +74,13 @@ class ELOSystem:
         win_streak = self.win_streaks.get(agent_id, 0)
         if win_streak > 3:
             # Agent is consistently winning, may be underrated
-            k *= (1.0 + min(0.5, 0.1 * win_streak))
+            k *= min(1.0 + 0.1 * win_streak, 1.2)
             
         # Adjust for confidence
         conf = self.get_confidence(agent_id)
         if conf < 0.7:
             # Lower confidence means we should adjust rating more aggressively
-            k *= (1.0 + (0.7 - conf))
+            k *= min(1.0 + (0.7 - conf), 1.2)
             
         return k
     
@@ -155,6 +158,7 @@ class ModelPool:
         """
         self.save_dir = save_dir
         self.max_pool_size = max_pool_size
+        self.base_elo = base_elo  # Store base_elo as instance variable
         self.models = []  # List of (model_path, agent_id, elo) tuples
         self.elo_system = ELOSystem(base_elo=base_elo, k_factor=40)  # Higher k-factor for faster adjustments
         self.latest_agent_id = 0
@@ -201,7 +205,7 @@ class ModelPool:
             # Progressively increase starting rating based on episode
             # This assumes newer models are generally better
             base_boost = min(100, current_episode / 50)  # Cap the boost at 100 points
-            initial_rating = self.elo_system.base_elo + base_boost
+            initial_rating = self.base_elo + base_boost
         
         # Add model to ELO system with lower initial confidence
         # to allow faster rating adjustments
@@ -388,7 +392,7 @@ class ModelPool:
         Returns:
             The loaded model and its agent_id
         """
-        checkpoint = torch.load(model_path)
+        checkpoint = torch.load(model_path, weights_only=True)
         model.load_state_dict(checkpoint['model_state_dict'])
         agent_id = checkpoint.get('agent_id', 0)
         return model, agent_id
@@ -410,7 +414,7 @@ class ELOTracker:
         self.main_agent_id = "main"
         self.opponent_history = {}  # Track results against specific opponents
         self.smoothed_elo = 1000  # Exponentially smoothed ELO for stability
-        self.smoothing_factor = 0.9  # Higher = more smoothing
+        self.smoothing_factor = 0.7  # Reduced from 0.9 for more responsive changes
         
         # Add the main agent to the ELO system
         self.elo_system.add_agent(self.main_agent_id)

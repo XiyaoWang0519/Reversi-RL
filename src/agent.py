@@ -103,18 +103,19 @@ class RLAgent:
         
         # Initialize neural network
         self.model = ReversiNet(board_size, num_channels, device).to(device)
-        # Use a smaller learning rate for more stable learning
-        self.optimizer = optim.Adam(self.model.parameters(), lr=0.0005, weight_decay=1e-4)
+        # Increased learning rate and adjusted optimizer parameters
+        self.optimizer = optim.Adam(self.model.parameters(), lr=0.001, weight_decay=1e-4)
         
-        # Improved replay buffer - larger to retain more diverse experiences
+        # Improved replay buffer with prioritization
         self.replay_buffer = deque(maxlen=50000)
+        self.priorities = deque(maxlen=50000)  # Store priorities for experiences
         
         # Training parameters
-        self.batch_size = 256  # Larger batch size for better gradient estimates
+        self.batch_size = 128  # Reduced batch size for more frequent updates
         self.gamma = 0.99  # Discount factor
-        self.value_weight = 1.0  # Weight for value loss
-        self.policy_weight = 1.0  # Weight for policy loss
-        self.entropy_weight = 0.01  # Weight for entropy regularization
+        self.value_weight = 1.0  # Base value loss weight
+        self.policy_weight = 1.5  # Increased policy weight
+        self.entropy_weight = 0.05  # Increased entropy weight for exploration
         
     def select_move(self, board, valid_moves, training=True, temperature=1.0):
         """Select a move based on the current policy with improved exploration."""
@@ -181,8 +182,13 @@ class RLAgent:
         return move
     
     def store_experience(self, state, player, policy, reward):
-        """Store an experience in the replay buffer."""
-        self.replay_buffer.append((state, player, policy, reward))
+        """Store an experience in the replay buffer with priority."""
+        # Scale reward from [-1, 1] to [0, 1]
+        scaled_reward = (reward + 1) / 2
+        # Calculate priority based on reward magnitude
+        priority = abs(reward) + 0.01  # Small constant to ensure non-zero priority
+        self.replay_buffer.append((state, player, policy, scaled_reward))
+        self.priorities.append(priority)
     
     def update_model(self):
         """Update model weights using experiences from replay buffer with improved learning."""
@@ -194,15 +200,11 @@ class RLAgent:
         total_loss_avg = 0
         
         for _ in range(num_updates):
-            # Sample batch with prioritization:
-            # - More weight to recent experiences (they're likely more relevant)
-            # - More diverse states for better generalization
-            
-            # Simple prioritization: Recent experiences have higher probability
-            probs = np.linspace(0.5, 1.0, len(self.replay_buffer))
+            # Prioritized sampling based on stored priorities
+            probs = np.array(self.priorities)
             probs = probs / np.sum(probs)
             
-            # Sample batch indices
+            # Sample batch indices using priorities
             batch_indices = np.random.choice(
                 len(self.replay_buffer), 
                 size=self.batch_size, 
